@@ -1,4 +1,5 @@
-export LIBTORCH=/opt/homebrew/Caskroom/miniforge/base/envs/torch/lib/python3.9/site-packages/torch
-export DYLD_LIBRARY_PATH=${LIBTORCH}/lib
-
-./marshal
+cargo clean
+# docker build -t marshal .
+docker build -t marshal .
+# docker run --rm marshal
+docker run --rm -it --entrypoint bash marshal

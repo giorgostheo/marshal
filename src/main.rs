@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 use streams::{cleaned, compressed, resampled};
 use structs::{Coordinate, Pois, Record, TrajCollection, Trajectory};
-use tch;
+// use tch;
 
 // use std::{thread, time};
 
@@ -30,7 +30,7 @@ fn run(path: &str, pois_path: &str) -> Result<(), csv::Error> {
 
     let pois: Pois = Pois::new_from_path(pois_path);
 
-    let model = tch::CModule::load(MODEL_PATH).unwrap();
+    // let model = tch::CModule::load(MODEL_PATH).unwrap();
 
     // pois.pretty();
     // println!("oid\tlon\tlat\tspeed\tbearing\tstoped\ttrip\ttimestamp\tpoi_id\tgps");
@@ -85,7 +85,7 @@ fn run(path: &str, pois_path: &str) -> Result<(), csv::Error> {
 
         let now = Instant::now();
 
-        traj_clean.predict_for_oid(record.oid, &model);
+        // traj_clean.predict_for_oid(record.oid, &model);
 
         cnt_pred += now.elapsed().as_nanos() as f64;
     }

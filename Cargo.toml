@@ -10,9 +10,14 @@ csv = "1.1"
 serde = { version = "1.0", features = ["derive"] }
 libm = "*"
 kdam = "*"
-tch = "0.11.0"
+# tch = "0.11.0"
 proj = "0.27.0"
 itertools = "0.10.5"
 
 [release]
 opt-level = 3
+
+[target.stable-aarch64-unknown-linux-gnu]
+rustflags = [
+    "-C", "linker=gcc-12",
+]
