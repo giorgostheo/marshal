@@ -4,7 +4,7 @@ use proj::Proj;
 use serde::Deserialize;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-// use tch::{CModule, Tensor};
+use tch::{CModule, Tensor};
 
 #[derive(Deserialize, Clone)]
 pub struct Record {
@@ -436,73 +436,73 @@ impl TrajCollection {
         flocked_oids
     }
 
-    // pub fn predict_for_oid(&self, oid: i32, model: &CModule) -> Option<Coordinate> {
-    //     // eprintln!();
+    pub fn predict_for_oid(&self, oid: i32, model: &CModule) -> Option<Coordinate> {
+        // eprintln!();
 
-    //     let traj = self.object.get(&oid)?;
+        let traj = self.object.get(&oid)?;
 
-    //     if traj.coordinates.len() < 13 {
-    //         return None;
-    //     }
+        if traj.coordinates.len() < 13 {
+            return None;
+        }
 
-    //     let mut xs = vec![];
-    //     let mut ys = vec![];
-    //     let mut ts = vec![];
+        let mut xs = vec![];
+        let mut ys = vec![];
+        let mut ts = vec![];
 
-    //     let ft_to_m = Proj::new_known_crs("EPSG:4326", "EPSG:3857", None).unwrap();
+        let ft_to_m = Proj::new_known_crs("EPSG:4326", "EPSG:3857", None).unwrap();
 
-    //     let mut data = vec![];
+        let mut data = vec![];
 
-    //     for coord in traj.coordinates[traj.coordinates.len() - 13..].iter() {
-    //         let projected: (f32, f32) = ft_to_m.convert((coord.x, coord.y)).unwrap();
-    //         xs.push(projected.0);
-    //         ys.push(projected.1);
-    //     }
+        for coord in traj.coordinates[traj.coordinates.len() - 13..].iter() {
+            let projected: (f32, f32) = ft_to_m.convert((coord.x, coord.y)).unwrap();
+            xs.push(projected.0);
+            ys.push(projected.1);
+        }
 
-    //     for timestamp in traj.timestamps[traj.timestamps.len() - 13..].iter() {
-    //         ts.push(timestamp.clone());
-    //     }
+        for timestamp in traj.timestamps[traj.timestamps.len() - 13..].iter() {
+            ts.push(timestamp.clone());
+        }
 
-    //     let tmp = ts
-    //         .iter()
-    //         .zip(ts.iter().skip(1))
-    //         .map(|(tsa, tsb)| (tsb - tsa) as f32 / 1800.0)
-    //         .collect::<Vec<_>>();
+        let tmp = ts
+            .iter()
+            .zip(ts.iter().skip(1))
+            .map(|(tsa, tsb)| (tsb - tsa) as f32 / 1800.0)
+            .collect::<Vec<_>>();
 
-    //     for (a, b, c, d) in izip!(
-    //         tmp[1..11].iter(),
-    //         tmp[2..12].iter(),
-    //         xs.iter().skip(2).zip(xs.iter().skip(3)),
-    //         ys.iter().skip(2).zip(ys.iter().skip(3))
-    //     ) {
-    //         data.push(a.to_owned() as f32);
-    //         data.push(b.to_owned() as f32);
-    //         data.push((c.1 - c.0 - 0.604) / 245.366);
-    //         data.push((d.1 - d.0 - 1.619) / 232.757);
-    //     }
-    //     // let mut binding = data.as_mut_slice().chunks_mut(11).collect::<Vec<_>>().as_slice();
-    //     // let data = binding.as_slice();
+        for (a, b, c, d) in izip!(
+            tmp[1..11].iter(),
+            tmp[2..12].iter(),
+            xs.iter().skip(2).zip(xs.iter().skip(3)),
+            ys.iter().skip(2).zip(ys.iter().skip(3))
+        ) {
+            data.push(a.to_owned() as f32);
+            data.push(b.to_owned() as f32);
+            data.push((c.1 - c.0 - 0.604) / 245.366);
+            data.push((d.1 - d.0 - 1.619) / 232.757);
+        }
+        // let mut binding = data.as_mut_slice().chunks_mut(11).collect::<Vec<_>>().as_slice();
+        // let data = binding.as_slice();
 
-    //     let output = Vec::<f32>::from(
-    //         model
-    //             .forward_ts(&[
-    //                 Tensor::of_slice(data.as_slice()).reshape(&[1, 10, 4]),
-    //                 Tensor::of_slice(&[1]),
-    //             ])
-    //             .unwrap(),
-    //     );
+        let output = Vec::<f32>::from(
+            model
+                .forward_ts(&[
+                    Tensor::of_slice(data.as_slice()).reshape(&[1, 10, 4]),
+                    Tensor::of_slice(&[1]),
+                ])
+                .unwrap(),
+        );
 
-    //     let (predlondiff, predlatdiff) = (output[0] * 245.366 + 0.604, output[1] * 232.757 + 1.619);
+        let (predlondiff, predlatdiff) = (output[0] * 245.366 + 0.604, output[1] * 232.757 + 1.619);
 
-    //     let predlon = xs.last().unwrap() + predlondiff;
-    //     let predlat = ys.last().unwrap() + predlatdiff;
+        let predlon = xs.last().unwrap() + predlondiff;
+        let predlat = ys.last().unwrap() + predlatdiff;
 
-    //     let m_to_deg = Proj::new_known_crs("EPSG:3857", "EPSG:4326", None).unwrap();
+        let m_to_deg = Proj::new_known_crs("EPSG:3857", "EPSG:4326", None).unwrap();
 
-    //     Some(Coordinate::from_tuple(
-    //         m_to_deg.convert((predlon, predlat)).unwrap(),
-    //     ))
-    // }
+        Some(Coordinate::from_tuple(
+            m_to_deg.convert((predlon, predlat)).unwrap(),
+        ))
+    }
 }
 
 pub struct Pois {
