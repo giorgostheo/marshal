@@ -1,4 +1,5 @@
 use crate::structs::{Coordinate, Pois, Record, TrajCollection, Trajectory};
+use std::env;
 
 // use std::{thread, time}
 
@@ -99,6 +100,7 @@ pub fn resampled(record: Record, traj_coll: &TrajCollection, pois: &Pois) -> Tra
 pub fn compressed(
     record: Record,
     traj_coll: &TrajCollection,
+    traj_coll_all: &TrajCollection,
     pois: &Pois,
 ) -> (Trajectory, Option<usize>) {
     if !traj_coll.object.contains_key(&record.oid) {
@@ -136,7 +138,17 @@ pub fn compressed(
         return (new_traj, None);
     };
 
-    let return_id = oid_traj.OPW_TR(&coord, record.t);
+    let key = "CMP_ALGO";
+    let return_id = match env::var(key) {
+        Ok(v) =>  match v.as_str() {
+            "opw" => oid_traj.OPW(&coord, record.t),
+            "opw_tr" => oid_traj.OPW_TR(&coord, record.t),
+            "uniform" => oid_traj.uniform(&traj_coll_all),
+            "dead_reckoning" => oid_traj.dead_reckoning(&coord, record.t),
+            _ => panic!("$ {} algorithm not found",v ),
+        },
+        Err(e) => panic!("${} is not set ({})", key, e),
+    };
 
     // match return_id {
     //     Some(return_id_usize) => {

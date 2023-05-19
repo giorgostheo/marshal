@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 use streams::{cleaned, compressed, resampled};
 use structs::{Coordinate, Pois, Record, TrajCollection, Trajectory};
+use std::env;
 use tch;
 
 // use std::{thread, time};
@@ -20,7 +21,10 @@ static FLOCKS_DISTANCE_THRESHOLD: f32 = 0.3; // nmiles
 static FLOCKS_MAX_DT_THRESHOLD: i32 = 30 * 60; // seconds
 static FLOCKS_MAX_BEARING_THRESHOLD: f32 = 20.0;
 static COMP_THR: f32 = 0.1;
-static OPW_EPSILON: f32 = 0.0003;
+static OPW_TR_EPSILON: f32 = 0.0003;
+static OPW_EPSILON:f32 = 0.0005;
+static UNIFORM_S: usize = 5;
+static DEAD_REC_EPSILON: f32 = 0.0001;
 static MODEL_PATH: &str = "vrf_brest_proto_jit_trace.pth";
 
 fn run(path: &str, pois_path: &str) -> Result<(), csv::Error> {
@@ -72,10 +76,9 @@ fn run(path: &str, pois_path: &str) -> Result<(), csv::Error> {
         cnt_resed += now.elapsed().as_nanos() as f64;
 
         // ------------
-
         let now = Instant::now();
 
-        let (compressed_traj, flush_id) = compressed(record.clone(), &traj_comp, &pois);
+        let (compressed_traj, flush_id) = compressed(record.clone(), &traj_comp,&traj_clean, &pois);
 
         traj_comp.extend_flush(compressed_traj, flush_id);
 
@@ -102,6 +105,14 @@ fn run(path: &str, pois_path: &str) -> Result<(), csv::Error> {
 }
 
 fn main() {
+    // Read arguments, set env variable
+    let args: Vec<String> = env::args().collect();
+    let cmp_algo = match args.len() {
+        3 => &args[1],
+        _ => panic!("$ Compression algorithm choice should be given as an argument"),
+    };
+    env::set_var("CMP_ALGO", cmp_algo);
+
     // run("mt.csv", "ports_saronikos.csv");
     eprintln!("{:?}", run("brest.csv", "ports_brest.csv"));
 }
