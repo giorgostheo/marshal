@@ -250,6 +250,16 @@ impl Trajectory {
         self.coordinates.last().unwrap().bearing(coord)
     }
 
+    pub fn calculate_distace(&self,i: usize) -> f32 {
+        ((self.coordinates[i+1].y - self.coordinates[i].y).powi(2) + (self.coordinates[i+1].x - self.coordinates[i].x).powi(2)).sqrt()
+    }
+
+    pub fn calculate_angle(&self, i: usize) -> f32 {
+        let lat_diff = self.coordinates[i].y - self.coordinates[i+1].y;
+        let lon_diff = self.coordinates[i].x - self.coordinates[i+1].x;
+        lon_diff.atan2(lat_diff)
+    }
+
     pub fn resample(&self, rate: i32, timestamp: &i32, sp: f32, br: f32) -> Vec<(Coordinate, i32)> {
         // eprintln!("{} - {} - {}", (timestamp-self.last_timestamp)/rate, timestamp, self.last_timestamp);
         let mut coords = vec![];
@@ -273,29 +283,46 @@ impl Trajectory {
         )
     }
 
-    pub fn OPW_TR(&self, coord: &Coordinate, timestamp: i32) -> Option<usize> {
-        fn _calc_SED(
-            pnt_s: &Coordinate,
-            ts_s: i32,
-            pnt_m: &Coordinate,
-            ts_m: i32,
-            pnt_e: &Coordinate,
-            ts_e: i32,
-        ) -> f32 {
-            let numerator = ts_m - ts_s;
-            let denominator = ts_e - ts_s;
+    fn _calc_SED(&self,
+        pnt_s: &Coordinate,
+        ts_s: i32,
+        pnt_m: &Coordinate,
+        ts_m: i32,
+        pnt_e: &Coordinate,
+        ts_e: i32,
+    ) -> f32 {
+        let numerator = ts_m - ts_s;
+        let denominator = ts_e - ts_s;
 
-            let time_ratio = if denominator != 0 {
-                numerator / denominator
-            } else {
-                1
-            };
+        let time_ratio = if denominator != 0 {
+            numerator / denominator
+        } else {
+            1
+        };
 
-            let x_value = pnt_s.x + (pnt_e.x - pnt_s.x) * time_ratio as f32;
-            let y_value = pnt_s.y + (pnt_e.y - pnt_s.y) * time_ratio as f32;
+        let x_value = pnt_s.x + (pnt_e.x - pnt_s.x) * time_ratio as f32;
+        let y_value = pnt_s.y + (pnt_e.y - pnt_s.y) * time_ratio as f32;
 
-            ((x_value - pnt_m.x).powi(2) + (y_value - pnt_m.y).powi(2)).sqrt()
+        ((x_value - pnt_m.x).powi(2) + (y_value - pnt_m.y).powi(2)).sqrt()
+    }
+
+    fn _calc_sde(&self,
+        pnt_s: &Coordinate,
+        pnt_m: &Coordinate,
+        pnt_e: &Coordinate,
+    ) -> f32 {
+        // x is lon, y is lat
+        let A: f32 = pnt_e.x - pnt_s.x;
+        let B: f32 = pnt_s.y - pnt_e.y;
+        let C: f32 = pnt_e.y * pnt_s.x - pnt_s.y * pnt_e.x;
+        if (A==0.0) && (B==0.0) {
+            return 0.0;
         }
+        let short_dist: f32 = ((A * pnt_m.y + B * pnt_m.x + C) / (A.powi(2) + B.powi(2)).sqrt()).abs();
+        short_dist
+    }
+
+    pub fn OPW_TR(&self, coord: &Coordinate, timestamp: i32) -> Option<usize> {
 
         if self.coordinates.len() < 2 {
             return None;
@@ -306,7 +333,7 @@ impl Trajectory {
             .zip(self.timestamps[1..].iter())
             .enumerate()
         {
-            let err_sed = _calc_SED(
+            let err_sed = self._calc_SED(
                 self.coordinates.first().unwrap(),
                 self.timestamps.first().unwrap().clone(),
                 mid_coord,
@@ -328,6 +355,59 @@ impl Trajectory {
         //         else
         //             i++;
         //     }
+        return None;
+    }
+
+    pub fn OPW(&self, coord: &Coordinate, timestamp: i32) -> Option<usize> {
+
+        if self.coordinates.len() < 2 {
+            return None;
+        }
+
+        for (mid_id, (mid_coord, mid_ts)) in self.coordinates[1..]
+            .iter()
+            .zip(self.timestamps[1..].iter())
+            .enumerate()
+        {
+            let err_sd = self._calc_sde(
+                self.coordinates.first().unwrap(),
+                mid_coord,
+                coord,
+            );
+            if err_sd > crate::OPW_EPSILON {
+                return Some(mid_id + 1);
+            }
+        }
+        return None;
+    }
+
+    pub fn uniform(&self, all_traj:&TrajCollection) -> Option<usize> {
+        let oid_traj: &Trajectory = all_traj.object.get(&self.oid).unwrap();
+        if oid_traj.coordinates.len() % crate::UNIFORM_S == 0 {
+            return Some(self.coordinates.len()-1);
+        }
+        return None;
+    }
+
+    pub fn dead_reckoning(&self, coord: &Coordinate, timestamp: i32) -> Option<usize> {
+        let mut max_d: f32 = 0.0;
+        
+        if self.coordinates.len() < 3 {
+            return None;
+        }
+
+        for (i, point) in self.coordinates[1..self.coordinates.len() -1]
+        .iter()
+        .enumerate() {
+            let curr_d = self.calculate_distace(i+1);
+            let curr_angle = self.calculate_angle(i+1);
+            let anchor_angle = self.calculate_angle(0);
+            max_d += (curr_d * (curr_angle - anchor_angle).sin()).abs();
+            
+            if max_d.abs() > crate::DEAD_REC_EPSILON {
+                return Some(i+1);
+            }
+        }
         return None;
     }
 }
